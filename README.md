@@ -1,6 +1,8 @@
 # OpenID Connect POC
 
-A proof-of-concept Next.js application demonstrating two parallel authentication flows — local username/password login and OpenID Connect (OIDC) SSO — backed by PostgreSQL.
+> **This is a proof-of-concept** for generic OpenID Connect authentication. It is intended for learning and evaluation purposes and is not production-ready as-is.
+
+A proof-of-concept Next.js application demonstrating two parallel authentication flows — local username/password login and OpenID Connect (OIDC) SSO — backed by PostgreSQL. The OIDC implementation is provider-agnostic and works with any standards-compliant identity provider.
 
 ## Features
 
