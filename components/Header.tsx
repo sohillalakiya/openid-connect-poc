@@ -1,0 +1,38 @@
+import pool, { type OIDCConfigRow } from '@/lib/db';
+import OIDCConfigButton from './OIDCConfigButton';
+import SignOutButton from './SignOutButton';
+
+interface Props {
+  username: string;
+}
+
+export default async function Header({ username }: Props) {
+  const { rows: [config] } = await pool.query<OIDCConfigRow>('SELECT * FROM oidc_config WHERE id = 1');
+
+  const safeConfig = {
+    well_known_url: config?.well_known_url ?? '',
+    client_id: config?.client_id ?? '',
+    client_secret: config?.client_secret ?? '',
+    scope: config?.scope ?? 'openid profile email',
+    enabled: config?.enabled ?? 0,
+  };
+
+  return (
+    <header className="w-full border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+      <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+            OIDC POC
+          </span>
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            Signed in as <strong>{username}</strong>
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <OIDCConfigButton config={safeConfig} />
+          <SignOutButton />
+        </div>
+      </div>
+    </header>
+  );
+}
