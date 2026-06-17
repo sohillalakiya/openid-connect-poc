@@ -15,6 +15,9 @@ export default async function Header({ username }: Props) {
     client_secret: config?.client_secret ?? '',
     scope: config?.scope ?? 'openid profile email',
     enabled: config?.enabled ?? 0,
+    client_type: (config?.client_type ?? 'confidential') as 'public' | 'confidential',
+    pkce_enabled: config?.pkce_enabled ?? 1,
+    token_endpoint_auth_method: (config?.token_endpoint_auth_method ?? 'client_secret_basic') as 'client_secret_basic' | 'client_secret_post' | 'none',
   };
 
   return (

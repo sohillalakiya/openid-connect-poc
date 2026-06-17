@@ -42,10 +42,11 @@ export async function GET(request: NextRequest): Promise<Response> {
     const tokens = await exchangeCode({
       tokenEndpoint: discovery.token_endpoint,
       clientId: config.client_id,
-      clientSecret: config.client_secret,
+      clientSecret: config.client_secret || undefined,
       code,
       redirectUri,
-      codeVerifier,
+      codeVerifier: codeVerifier || undefined,
+      authMethod: config.token_endpoint_auth_method ?? 'client_secret_basic',
     });
 
     idToken = tokens.id_token;

@@ -5,7 +5,7 @@ import OIDCConfigModal from './OIDCConfigModal';
 import type { OIDCConfigRow } from '@/lib/db';
 
 interface Props {
-  config: Pick<OIDCConfigRow, 'well_known_url' | 'client_id' | 'client_secret' | 'scope' | 'enabled'>;
+  config: Pick<OIDCConfigRow, 'well_known_url' | 'client_id' | 'client_secret' | 'scope' | 'enabled' | 'client_type' | 'pkce_enabled' | 'token_endpoint_auth_method'>;
 }
 
 export default function OIDCConfigButton({ config }: Props) {

@@ -47,7 +47,7 @@ export function buildAuthorizationURL(opts: {
   redirectUri: string;
   scope: string;
   state: string;
-  codeChallenge: string;
+  codeChallenge?: string;
 }): string {
   const params = new URLSearchParams({
     response_type: 'code',
@@ -55,32 +55,54 @@ export function buildAuthorizationURL(opts: {
     redirect_uri: opts.redirectUri,
     scope: opts.scope,
     state: opts.state,
-    code_challenge: opts.codeChallenge,
-    code_challenge_method: 'S256',
   });
+  if (opts.codeChallenge) {
+    params.set('code_challenge', opts.codeChallenge);
+    params.set('code_challenge_method', 'S256');
+  }
   return `${opts.authorizationEndpoint}?${params.toString()}`;
 }
 
 export async function exchangeCode(opts: {
   tokenEndpoint: string;
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   code: string;
   redirectUri: string;
-  codeVerifier: string;
+  codeVerifier?: string;
+  authMethod: 'client_secret_basic' | 'client_secret_post' | 'none';
 }): Promise<OIDCTokens> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
-    client_id: opts.clientId,
-    client_secret: opts.clientSecret,
     code: opts.code,
     redirect_uri: opts.redirectUri,
-    code_verifier: opts.codeVerifier,
   });
+
+  if (opts.codeVerifier) {
+    body.set('code_verifier', opts.codeVerifier);
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+
+  if (opts.authMethod === 'client_secret_basic') {
+    // Credentials in Authorization header — NOT in body
+    const credentials = Buffer.from(`${opts.clientId}:${opts.clientSecret ?? ''}`).toString('base64');
+    headers['Authorization'] = `Basic ${credentials}`;
+    body.set('client_id', opts.clientId);
+  } else if (opts.authMethod === 'client_secret_post') {
+    // Credentials in POST body
+    body.set('client_id', opts.clientId);
+    if (opts.clientSecret) body.set('client_secret', opts.clientSecret);
+  } else {
+    // none — public client, only client_id
+    body.set('client_id', opts.clientId);
+  }
 
   const res = await fetch(opts.tokenEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers,
     body: body.toString(),
     cache: 'no-store',
   });

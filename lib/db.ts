@@ -36,15 +36,23 @@ export async function initialize(): Promise<void> {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS oidc_config (
-      id             INTEGER PRIMARY KEY DEFAULT 1,
-      well_known_url TEXT NOT NULL DEFAULT '',
-      client_id      TEXT NOT NULL DEFAULT '',
-      client_secret  TEXT NOT NULL DEFAULT '',
-      scope          TEXT NOT NULL DEFAULT 'openid profile email',
-      enabled        INTEGER NOT NULL DEFAULT 0,
+      id                         INTEGER PRIMARY KEY DEFAULT 1,
+      well_known_url             TEXT NOT NULL DEFAULT '',
+      client_id                  TEXT NOT NULL DEFAULT '',
+      client_secret              TEXT NOT NULL DEFAULT '',
+      scope                      TEXT NOT NULL DEFAULT 'openid profile email',
+      enabled                    INTEGER NOT NULL DEFAULT 0,
+      client_type                TEXT NOT NULL DEFAULT 'confidential',
+      pkce_enabled               INTEGER NOT NULL DEFAULT 1,
+      token_endpoint_auth_method TEXT NOT NULL DEFAULT 'client_secret_basic',
       CONSTRAINT single_row CHECK (id = 1)
     )
   `);
+
+  // Migrate existing tables that predate these columns
+  await pool.query(`ALTER TABLE oidc_config ADD COLUMN IF NOT EXISTS client_type TEXT NOT NULL DEFAULT 'confidential'`);
+  await pool.query(`ALTER TABLE oidc_config ADD COLUMN IF NOT EXISTS pkce_enabled INTEGER NOT NULL DEFAULT 1`);
+  await pool.query(`ALTER TABLE oidc_config ADD COLUMN IF NOT EXISTS token_endpoint_auth_method TEXT NOT NULL DEFAULT 'client_secret_basic'`);
 
   console.log('[DB] Schema ready — tables: users, oidc_config');
 
@@ -80,6 +88,9 @@ export interface OIDCConfigRow {
   client_secret: string;
   scope: string;
   enabled: number;
+  client_type: 'public' | 'confidential';
+  pkce_enabled: number;
+  token_endpoint_auth_method: 'client_secret_basic' | 'client_secret_post' | 'none';
 }
 
 export default pool;
