@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import pool, { type OIDCConfigRow } from '@/lib/db';
 import {
@@ -65,18 +66,28 @@ export async function saveOIDCConfig(
     return { error: 'Failed to save configuration. Please try again.' };
   }
 
+  revalidatePath('/userinfo');
   return { success: true };
 }
 
-export async function resetOIDCConfig(): Promise<void> {
-  await pool.query(`
-    UPDATE oidc_config
-    SET well_known_url = '', client_id = '', client_secret = '',
-        scope = 'openid profile email', enabled = 0,
-        client_type = 'confidential', pkce_enabled = 1,
-        token_endpoint_auth_method = 'client_secret_basic'
-    WHERE id = 1
-  `);
+export async function resetOIDCConfig(
+  _prevState: OIDCConfigState | undefined,
+  _formData: FormData
+): Promise<OIDCConfigState> {
+  try {
+    await pool.query(`
+      UPDATE oidc_config
+      SET well_known_url = '', client_id = '', client_secret = '',
+          scope = 'openid profile email', enabled = 0,
+          client_type = 'confidential', pkce_enabled = 1,
+          token_endpoint_auth_method = 'client_secret_basic'
+      WHERE id = 1
+    `);
+  } catch {
+    return { error: 'Failed to reset configuration.' };
+  }
+  revalidatePath('/userinfo');
+  return { success: true };
 }
 
 export async function initiateOIDCLogin(): Promise<void> {

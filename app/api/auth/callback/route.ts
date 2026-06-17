@@ -19,10 +19,10 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   const storedState    = request.cookies.get('oidc_state')?.value;
-  const codeVerifier   = request.cookies.get('oidc_code_verifier')?.value;
+  const codeVerifier   = request.cookies.get('oidc_code_verifier')?.value ?? '';
   const endSessionEndpoint = request.cookies.get('oidc_end_session_endpoint')?.value ?? '';
 
-  if (!code || !state || !storedState || !codeVerifier || state !== storedState) {
+  if (!code || !state || !storedState || state !== storedState) {
     return NextResponse.redirect(new URL('/login?error=invalid_state', appUrl));
   }
 

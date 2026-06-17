@@ -15,6 +15,10 @@ export default function OIDCConfigModal({ open, onClose, config }: Props) {
     saveOIDCConfig,
     undefined
   );
+  const [resetState, resetAction, isResetPending] = useActionState<OIDCConfigState | undefined, FormData>(
+    resetOIDCConfig,
+    undefined
+  );
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [clientType, setClientType] = useState<'public' | 'confidential'>(
@@ -47,6 +51,10 @@ export default function OIDCConfigModal({ open, onClose, config }: Props) {
   useEffect(() => {
     if (state?.success) onClose();
   }, [state, onClose]);
+
+  useEffect(() => {
+    if (resetState?.success) onClose();
+  }, [resetState, onClose]);
 
   if (!open) return null;
 
@@ -254,12 +262,16 @@ export default function OIDCConfigModal({ open, onClose, config }: Props) {
       </form>
 
       <div className="px-6 pb-5 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
-        <form action={resetOIDCConfig}>
+        <form action={resetAction}>
+          {resetState?.error && (
+            <p className="text-xs text-red-600 mb-2">{resetState.error}</p>
+          )}
           <button
             type="submit"
-            className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            disabled={isResetPending}
+            className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
           >
-            Reset Configuration
+            {isResetPending ? 'Resetting…' : 'Reset Configuration'}
           </button>
         </form>
 
