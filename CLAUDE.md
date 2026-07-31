@@ -22,7 +22,15 @@ There is no test suite. The package manager is **pnpm**.
 | `SESSION_SECRET` | Signs session JWTs (HS256) — **must be set** | none |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://patra_user:SecurePostgres2024!@localhost:5432/patra_user` |
 | `NEXT_PUBLIC_APP_URL` | Canonical app URL used in OIDC redirect URIs | `http://localhost:3000` |
-| `SEED_USERNAME` / `SEED_PASSWORD` / `SEED_EMAIL` | Admin account seeded on first boot | `sohil` / `sohil` / `sohil@example.com` |
+| `SEED_USERNAME` / `SEED_PASSWORD` / `SEED_EMAIL` | Admin account seeded on first boot (checked by email) | `sohil` / `sohil` / `sohil@example.com` |
+| `SEED_OIDC_WELL_KNOWN_URL` | OIDC discovery URL — if set alongside `SEED_OIDC_CLIENT_ID`, seeds the OIDC config row on first boot; UI changes win on subsequent restarts | _(optional)_ |
+| `SEED_OIDC_CLIENT_ID` | OIDC client ID (required partner to `SEED_OIDC_WELL_KNOWN_URL`) | _(optional)_ |
+| `SEED_OIDC_CLIENT_SECRET` | OIDC client secret | `''` |
+| `SEED_OIDC_SCOPE` | OIDC scope string | `openid profile email` |
+| `SEED_OIDC_ENABLED` | Set `1` to enable OIDC login button on seed | `0` |
+| `SEED_OIDC_CLIENT_TYPE` | `public` or `confidential` | `confidential` |
+| `SEED_OIDC_PKCE_ENABLED` | Set `0` to disable PKCE | `1` |
+| `SEED_OIDC_TOKEN_ENDPOINT_AUTH_METHOD` | `client_secret_basic`, `client_secret_post`, or `none` | `client_secret_basic` |
 
 ## Architecture
 

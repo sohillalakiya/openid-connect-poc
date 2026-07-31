@@ -61,17 +61,44 @@ export async function initialize(): Promise<void> {
   const email    = process.env.SEED_EMAIL    ?? 'sohil@example.com';
 
   const result = await pool.query(
-    'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+    'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING',
     [username, email, hashSync(password, 10)]
   );
 
   if (result.rowCount && result.rowCount > 0) {
     console.log(`[DB] Admin user seeded — username: ${username}, email: ${email}`);
   } else {
-    console.log(`[DB] Admin user already exists — username: ${username}`);
+    console.log(`[DB] Admin user already exists — email: ${email}`);
   }
 
-  await pool.query('INSERT INTO oidc_config (id) VALUES (1) ON CONFLICT DO NOTHING');
+  const oidcWellKnown = process.env.SEED_OIDC_WELL_KNOWN_URL;
+  const oidcClientId  = process.env.SEED_OIDC_CLIENT_ID;
+
+  if (oidcWellKnown && oidcClientId) {
+    const oidcResult = await pool.query(
+      `INSERT INTO oidc_config (id, well_known_url, client_id, client_secret, scope, enabled,
+         client_type, pkce_enabled, token_endpoint_auth_method)
+       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT DO NOTHING`,
+      [
+        oidcWellKnown,
+        oidcClientId,
+        process.env.SEED_OIDC_CLIENT_SECRET ?? '',
+        process.env.SEED_OIDC_SCOPE ?? 'openid profile email',
+        process.env.SEED_OIDC_ENABLED === '1' ? 1 : 0,
+        process.env.SEED_OIDC_CLIENT_TYPE ?? 'confidential',
+        process.env.SEED_OIDC_PKCE_ENABLED === '0' ? 0 : 1,
+        process.env.SEED_OIDC_TOKEN_ENDPOINT_AUTH_METHOD ?? 'client_secret_basic',
+      ]
+    );
+    if (oidcResult.rowCount && oidcResult.rowCount > 0) {
+      console.log('[DB] OIDC config seeded from env');
+    } else {
+      console.log('[DB] OIDC config already exists — skipping env seed');
+    }
+  } else {
+    await pool.query('INSERT INTO oidc_config (id) VALUES (1) ON CONFLICT DO NOTHING');
+  }
 }
 
 export interface UserRow {

@@ -7,6 +7,7 @@ export interface SessionPayload {
   loginMethod: 'local' | 'oidc';
   idToken?: string;
   endSessionEndpoint?: string;
+  accessToken?: string;
 }
 
 const COOKIE_NAME = 'session';

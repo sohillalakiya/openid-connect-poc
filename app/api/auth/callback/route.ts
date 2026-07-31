@@ -97,6 +97,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     loginMethod: 'oidc',
     idToken,
     endSessionEndpoint: endSessionEndpoint || undefined,
+    accessToken: tokens.access_token,
   });
 
   const res = NextResponse.redirect(new URL('/userinfo', appUrl));

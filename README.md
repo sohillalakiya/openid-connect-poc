@@ -42,7 +42,13 @@ pnpm install
 
 ### 2. Configure environment
 
-Create a `.env.local` file in the project root:
+Copy `.env.example` to `.env.local` and fill in the values:
+
+```bash
+cp .env.example .env.local
+```
+
+Minimum required values:
 
 ```env
 # Required — used to sign session JWTs
@@ -54,10 +60,15 @@ DATABASE_URL=postgresql://patra_user:SecurePostgres2024!@localhost:5432/patra_us
 # Canonical app URL used in OIDC redirect URIs
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Admin account seeded on first boot (optional, defaults shown)
+# Admin account seeded on first boot — uniqueness checked by email
 SEED_USERNAME=sohil
 SEED_PASSWORD=sohil
 SEED_EMAIL=sohil@example.com
+
+# Optional: pre-seed OIDC config from env (both must be set to take effect)
+# Only applied when no config row exists; UI changes win on subsequent restarts
+# SEED_OIDC_WELL_KNOWN_URL=https://your-idp.example.com/realms/myrealm/.well-known/openid-configuration
+# SEED_OIDC_CLIENT_ID=your-client-id
 ```
 
 ### 3. Start PostgreSQL
@@ -91,14 +102,20 @@ Open [http://localhost:3000](http://localhost:3000). You will be redirected to t
 3. The app generates a PKCE code verifier + challenge and redirects to the IdP.
 4. After IdP authentication the IdP redirects back to `/api/auth/callback`.
 5. The app exchanges the code for tokens, fetches the userinfo endpoint, and extracts the `email` claim.
-6. The email is looked up in the `users` table. If found, a session is created. If not, an "Access Denied" error page is shown.
+6. The email is looked up in the `users` table. If found, a session is created (storing `id_token` and `access_token`). If not, an "Access Denied" error page is shown.
 
 **Redirect URI to register with your IdP:**
 ```
 http://localhost:3000/api/auth/callback
 ```
 
-## Configuring OIDC at Runtime
+## Configuring OIDC
+
+### Option A — via environment variables (first boot only)
+
+Set `SEED_OIDC_WELL_KNOWN_URL` and `SEED_OIDC_CLIENT_ID` (plus any optional vars) in `.env.local` before the first server start. The config row is seeded once; on subsequent restarts the env vars are ignored so UI changes are preserved.
+
+### Option B — via the UI (any time)
 
 1. Log in with the local admin account.
 2. Click **Integrate OIDC** in the top-right header.
@@ -108,7 +125,7 @@ http://localhost:3000/api/auth/callback
    - **Scope** — must include `email` (default: `openid profile email`)
 4. Toggle **Enable OIDC Login** and click **Save**.
 
-The login page will immediately show a **Login with OIDC** button.
+The login page will immediately show a **Login with OIDC** button. UI changes always override env-seeded values for future restarts.
 
 ## Environment Variables
 
@@ -117,9 +134,17 @@ The login page will immediately show a **Login with OIDC** button.
 | `SESSION_SECRET` | Yes | — | Secret key for signing JWTs (use a long random string) |
 | `DATABASE_URL` | No | `postgresql://patra_user:SecurePostgres2024!@localhost:5432/patra_user` | PostgreSQL connection string |
 | `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | Canonical app URL used in OIDC redirect URIs |
-| `SEED_USERNAME` | No | `sohil` | Admin username created on first boot |
-| `SEED_PASSWORD` | No | `sohil` | Admin password created on first boot |
-| `SEED_EMAIL` | No | `sohil@example.com` | Admin email created on first boot |
+| `SEED_USERNAME` | No | `sohil` | Admin username seeded on first boot |
+| `SEED_PASSWORD` | No | `sohil` | Admin password seeded on first boot |
+| `SEED_EMAIL` | No | `sohil@example.com` | Admin email seeded on first boot — **uniqueness is checked by email** |
+| `SEED_OIDC_WELL_KNOWN_URL` | No | — | OIDC discovery URL; must be set with `SEED_OIDC_CLIENT_ID` to trigger seeding |
+| `SEED_OIDC_CLIENT_ID` | No | — | OIDC client ID |
+| `SEED_OIDC_CLIENT_SECRET` | No | `''` | OIDC client secret |
+| `SEED_OIDC_SCOPE` | No | `openid profile email` | OIDC scope string |
+| `SEED_OIDC_ENABLED` | No | `0` | Set `1` to enable the OIDC login button immediately after seeding |
+| `SEED_OIDC_CLIENT_TYPE` | No | `confidential` | `public` or `confidential` |
+| `SEED_OIDC_PKCE_ENABLED` | No | `1` | Set `0` to disable PKCE |
+| `SEED_OIDC_TOKEN_ENDPOINT_AUTH_METHOD` | No | `client_secret_basic` | `client_secret_basic`, `client_secret_post`, or `none` |
 
 ## Available Scripts
 
