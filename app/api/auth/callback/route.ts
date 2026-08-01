@@ -34,6 +34,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   let email: string;
   let idToken: string;
+  let accessToken: string;
 
   try {
     const discovery = await fetchOIDCConfig(config.well_known_url);
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     });
 
     idToken = tokens.id_token;
+    accessToken = tokens.access_token;
 
     const userinfo = await fetchUserInfo(discovery.userinfo_endpoint, tokens.access_token);
     email = extractEmail(userinfo);
@@ -97,7 +99,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     loginMethod: 'oidc',
     idToken,
     endSessionEndpoint: endSessionEndpoint || undefined,
-    accessToken: tokens.access_token,
+    accessToken,
   });
 
   const res = NextResponse.redirect(new URL('/userinfo', appUrl));
