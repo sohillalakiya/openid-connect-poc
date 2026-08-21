@@ -3,6 +3,7 @@ import { verifySession } from '@/lib/dal';
 import OIDCConfigButton from './OIDCConfigButton';
 import SignOutButton from './SignOutButton';
 import { WaffleMenu } from './WaffleMenu';
+import ThemeToggle from './ThemeToggle';
 
 interface Props {
   username: string;
@@ -41,6 +42,7 @@ export default async function Header({ username }: Props) {
         <div className="flex items-center gap-3">
           <platform-waffle token={accessToken} theme="auto" />
           {/*<OIDCConfigButton config={safeConfig} />*/}
+          <ThemeToggle />
           <SignOutButton />
         </div>
       </div>
