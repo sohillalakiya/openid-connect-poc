@@ -23,6 +23,7 @@ There is no test suite. The package manager is **pnpm**.
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://patra_user:SecurePostgres2024!@localhost:5432/patra_user` |
 | `NEXT_PUBLIC_APP_URL` | Canonical app URL used in OIDC redirect URIs | `http://localhost:3000` |
 | `SEED_USERNAME` / `SEED_PASSWORD` / `SEED_EMAIL` | Admin account seeded on first boot (checked by email) | `sohil` / `sohil` / `sohil@example.com` |
+| `SEED_OVERWRITE_DB` | Set `1` to upsert seed data on every start, overwriting existing DB rows | `0` |
 | `SEED_OIDC_WELL_KNOWN_URL` | OIDC discovery URL — if set alongside `SEED_OIDC_CLIENT_ID`, seeds the OIDC config row on first boot; UI changes win on subsequent restarts | _(optional)_ |
 | `SEED_OIDC_CLIENT_ID` | OIDC client ID (required partner to `SEED_OIDC_WELL_KNOWN_URL`) | _(optional)_ |
 | `SEED_OIDC_CLIENT_SECRET` | OIDC client secret | `''` |

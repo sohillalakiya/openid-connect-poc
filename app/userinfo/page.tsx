@@ -2,15 +2,12 @@ import { verifySession, getUser } from '@/lib/dal';
 import Header from '@/components/Header';
 
 export default async function UserInfoPage() {
-  const session = await verifySession();
-  const user = await getUser();
-
+  const [session, user] = await Promise.all([verifySession(), getUser()]);
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <Header username={user.username} />
-
       <main className="max-w-4xl mx-auto px-6 py-10 flex flex-col gap-10">
 
         {/* Current session */}

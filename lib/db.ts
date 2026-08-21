@@ -56,43 +56,62 @@ export async function initialize(): Promise<void> {
 
   console.log('[DB] Schema ready — tables: users, oidc_config');
 
-  const username = process.env.SEED_USERNAME ?? 'sohil';
-  const password = process.env.SEED_PASSWORD ?? 'sohil';
-  const email    = process.env.SEED_EMAIL    ?? 'sohil@example.com';
+  const username      = process.env.SEED_USERNAME ?? 'sohil';
+  const password      = process.env.SEED_PASSWORD ?? 'sohil';
+  const email         = process.env.SEED_EMAIL    ?? 'sohil@example.com';
+  const overwrite     = process.env.SEED_OVERWRITE_DB === '1';
 
-  const result = await pool.query(
-    'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING',
+  const userResult = await pool.query(
+    overwrite
+      ? `INSERT INTO users (username, email, password) VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username, password = EXCLUDED.password`
+      : `INSERT INTO users (username, email, password) VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO NOTHING`,
     [username, email, hashSync(password, 10)]
   );
 
-  if (result.rowCount && result.rowCount > 0) {
-    console.log(`[DB] Admin user seeded — username: ${username}, email: ${email}`);
+  if (userResult.rowCount && userResult.rowCount > 0) {
+    console.log(`[DB] Admin user ${overwrite ? 'upserted' : 'seeded'} — username: ${username}, email: ${email}`);
   } else {
-    console.log(`[DB] Admin user already exists — email: ${email}`);
+    console.log(`[DB] Admin user already exists — skipping (email: ${email})`);
   }
 
   const oidcWellKnown = process.env.SEED_OIDC_WELL_KNOWN_URL;
   const oidcClientId  = process.env.SEED_OIDC_CLIENT_ID;
 
   if (oidcWellKnown && oidcClientId) {
+    const oidcValues = [
+      oidcWellKnown,
+      oidcClientId,
+      process.env.SEED_OIDC_CLIENT_SECRET ?? '',
+      process.env.SEED_OIDC_SCOPE ?? 'openid profile email',
+      process.env.SEED_OIDC_ENABLED === '1' ? 1 : 0,
+      process.env.SEED_OIDC_CLIENT_TYPE ?? 'confidential',
+      process.env.SEED_OIDC_PKCE_ENABLED === '0' ? 0 : 1,
+      process.env.SEED_OIDC_TOKEN_ENDPOINT_AUTH_METHOD ?? 'client_secret_basic',
+    ];
     const oidcResult = await pool.query(
-      `INSERT INTO oidc_config (id, well_known_url, client_id, client_secret, scope, enabled,
-         client_type, pkce_enabled, token_endpoint_auth_method)
-       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT DO NOTHING`,
-      [
-        oidcWellKnown,
-        oidcClientId,
-        process.env.SEED_OIDC_CLIENT_SECRET ?? '',
-        process.env.SEED_OIDC_SCOPE ?? 'openid profile email',
-        process.env.SEED_OIDC_ENABLED === '1' ? 1 : 0,
-        process.env.SEED_OIDC_CLIENT_TYPE ?? 'confidential',
-        process.env.SEED_OIDC_PKCE_ENABLED === '0' ? 0 : 1,
-        process.env.SEED_OIDC_TOKEN_ENDPOINT_AUTH_METHOD ?? 'client_secret_basic',
-      ]
+      overwrite
+        ? `INSERT INTO oidc_config (id, well_known_url, client_id, client_secret, scope, enabled,
+             client_type, pkce_enabled, token_endpoint_auth_method)
+           VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (id) DO UPDATE SET
+             well_known_url             = EXCLUDED.well_known_url,
+             client_id                  = EXCLUDED.client_id,
+             client_secret              = EXCLUDED.client_secret,
+             scope                      = EXCLUDED.scope,
+             enabled                    = EXCLUDED.enabled,
+             client_type                = EXCLUDED.client_type,
+             pkce_enabled               = EXCLUDED.pkce_enabled,
+             token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method`
+        : `INSERT INTO oidc_config (id, well_known_url, client_id, client_secret, scope, enabled,
+             client_type, pkce_enabled, token_endpoint_auth_method)
+           VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT DO NOTHING`,
+      oidcValues
     );
     if (oidcResult.rowCount && oidcResult.rowCount > 0) {
-      console.log('[DB] OIDC config seeded from env');
+      console.log(`[DB] OIDC config ${overwrite ? 'overwritten' : 'seeded'} from env`);
     } else {
       console.log('[DB] OIDC config already exists — skipping env seed');
     }

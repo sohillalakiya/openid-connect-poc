@@ -12,6 +12,7 @@ A proof-of-concept Next.js application demonstrating two parallel authentication
 - **IdP logout** — sign-out triggers the IdP's `end_session_endpoint` when available
 - **Secure sessions** — HS256 signed JWT stored as an `httpOnly` cookie with an 8-hour TTL
 - **Database-gated access** — OIDC users must already exist in the `users` table (matched by email); no auto-provisioning
+- **Seed overwrite** — `SEED_OVERWRITE_DB=1` forces env seed values to overwrite existing DB data on every server start
 
 ## Tech Stack
 
@@ -66,7 +67,6 @@ SEED_PASSWORD=sohil
 SEED_EMAIL=sohil@example.com
 
 # Optional: pre-seed OIDC config from env (both must be set to take effect)
-# Only applied when no config row exists; UI changes win on subsequent restarts
 # SEED_OIDC_WELL_KNOWN_URL=https://your-idp.example.com/realms/myrealm/.well-known/openid-configuration
 # SEED_OIDC_CLIENT_ID=your-client-id
 ```
@@ -111,9 +111,13 @@ http://localhost:3000/api/auth/callback
 
 ## Configuring OIDC
 
-### Option A — via environment variables (first boot only)
+### Option A — via environment variables
 
-Set `SEED_OIDC_WELL_KNOWN_URL` and `SEED_OIDC_CLIENT_ID` (plus any optional vars) in `.env.local` before the first server start. The config row is seeded once; on subsequent restarts the env vars are ignored so UI changes are preserved.
+Set `SEED_OIDC_WELL_KNOWN_URL` and `SEED_OIDC_CLIENT_ID` (plus any optional vars) in `.env.local`.
+
+**Default behaviour (no `SEED_OVERWRITE_DB`):** config is seeded only once — when no `oidc_config` row exists. On subsequent restarts the env vars are ignored, so UI changes are preserved.
+
+**With `SEED_OVERWRITE_DB=1`:** the config row is upserted on every server start, overwriting any UI changes. Useful for ephemeral environments or CI where you always want env values to win.
 
 ### Option B — via the UI (any time)
 
@@ -125,7 +129,18 @@ Set `SEED_OIDC_WELL_KNOWN_URL` and `SEED_OIDC_CLIENT_ID` (plus any optional vars
    - **Scope** — must include `email` (default: `openid profile email`)
 4. Toggle **Enable OIDC Login** and click **Save**.
 
-The login page will immediately show a **Login with OIDC** button. UI changes always override env-seeded values for future restarts.
+The login page will immediately show a **Login with OIDC** button. Without `SEED_OVERWRITE_DB=1`, UI changes survive server restarts.
+
+## Seeding Behaviour
+
+The app seeds the admin user and OIDC config during startup (via `instrumentation.ts` → `lib/db.ts`).
+
+| `SEED_OVERWRITE_DB` | Admin user | OIDC config |
+|---|---|---|
+| unset / `0` | Insert only — skipped if email already exists | Insert only — skipped if row exists |
+| `1` | Upsert — updates `username` and `password` for existing email | Upsert — overwrites all fields unconditionally |
+
+> **Warning:** `SEED_OVERWRITE_DB=1` will overwrite the admin password and any UI-configured OIDC settings on every server start. Do not use in production unless that is the intended behaviour.
 
 ## Environment Variables
 
@@ -136,12 +151,13 @@ The login page will immediately show a **Login with OIDC** button. UI changes al
 | `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | Canonical app URL used in OIDC redirect URIs |
 | `SEED_USERNAME` | No | `sohil` | Admin username seeded on first boot |
 | `SEED_PASSWORD` | No | `sohil` | Admin password seeded on first boot |
-| `SEED_EMAIL` | No | `sohil@example.com` | Admin email seeded on first boot — **uniqueness is checked by email** |
+| `SEED_EMAIL` | No | `sohil@example.com` | Admin email — uniqueness key for user seeding |
+| `SEED_OVERWRITE_DB` | No | `0` | Set `1` to upsert seed data on every start, overwriting existing DB values |
 | `SEED_OIDC_WELL_KNOWN_URL` | No | — | OIDC discovery URL; must be set with `SEED_OIDC_CLIENT_ID` to trigger seeding |
 | `SEED_OIDC_CLIENT_ID` | No | — | OIDC client ID |
 | `SEED_OIDC_CLIENT_SECRET` | No | `''` | OIDC client secret |
 | `SEED_OIDC_SCOPE` | No | `openid profile email` | OIDC scope string |
-| `SEED_OIDC_ENABLED` | No | `0` | Set `1` to enable the OIDC login button immediately after seeding |
+| `SEED_OIDC_ENABLED` | No | `0` | Set `1` to enable the OIDC login button after seeding |
 | `SEED_OIDC_CLIENT_TYPE` | No | `confidential` | `public` or `confidential` |
 | `SEED_OIDC_PKCE_ENABLED` | No | `1` | Set `0` to disable PKCE |
 | `SEED_OIDC_TOKEN_ENDPOINT_AUTH_METHOD` | No | `client_secret_basic` | `client_secret_basic`, `client_secret_post`, or `none` |
@@ -185,7 +201,7 @@ lib/
   actions/auth.ts      # loginAction, logoutAction (Server Actions)
   actions/oidc-config.ts  # saveOIDCConfig, initiateOIDCLogin (Server Actions)
   dal.ts               # Data Access Layer — verifySession, getUser
-  db.ts                # PostgreSQL pool + schema initialization
+  db.ts                # PostgreSQL pool + schema initialization + seeding
   oidc.ts              # Pure OIDC helpers (PKCE, discovery, token exchange)
   session.ts           # JWT session encrypt/decrypt
 proxy.ts               # Route guard middleware (protects /userinfo)
@@ -198,3 +214,4 @@ instrumentation.ts     # DB initialization before first request
 - OIDC users are matched by email only — ensure email addresses in your IdP match those in the `users` table.
 - The app uses PKCE (`S256`) for all OIDC flows; the client secret is used only at the token endpoint.
 - No user is auto-provisioned; an administrator must add users to the database before they can log in via SSO.
+- Do not enable `SEED_OVERWRITE_DB=1` in production unless you explicitly want env values to overwrite DB state on every restart.
