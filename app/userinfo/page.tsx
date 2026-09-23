@@ -1,18 +1,24 @@
 import { cookies } from 'next/headers';
 import { verifySession, getUser } from '@/lib/dal';
-import pool, { type OIDCTokenRow } from '@/lib/db';
+import pool, { type OIDCTokenRow, type OIDCConfigRow } from '@/lib/db';
 import { OIDC_RT_COOKIE } from '@/lib/session';
 import Header from '@/components/Header';
 import AccessTokenTimer from '@/components/AccessTokenTimer';
 import TokenCard from '@/components/TokenCard';
+import OIDCConfigButton from '@/components/OIDCConfigButton';
 
 export default async function UserInfoPage() {
-  const [session, user, cookieStore] = await Promise.all([
+  const [session, user, cookieStore, oidcConfigResult] = await Promise.all([
     verifySession(),
     getUser(),
     cookies(),
+    pool.query<Pick<OIDCConfigRow, 'well_known_url' | 'client_id' | 'client_secret' | 'scope' | 'enabled' | 'client_type' | 'pkce_enabled' | 'token_endpoint_auth_method'>>(
+      'SELECT well_known_url, client_id, client_secret, scope, enabled, client_type, pkce_enabled, token_endpoint_auth_method FROM oidc_config WHERE id = 1'
+    ),
   ]);
   if (!user) return null;
+
+  const oidcConfig = oidcConfigResult.rows[0];
 
   let accessToken = '';
   let refreshToken = '';
@@ -168,6 +174,36 @@ export default async function UserInfoPage() {
             />
           </div>
         </section>
+
+        {/* OIDC Provider Configuration */}
+        {oidcConfig && (
+          <section>
+            <SectionHeader title="OIDC Provider" description="Configure the external identity provider for SSO login" />
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm px-6 py-5 flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  {oidcConfig.well_known_url || 'Not configured'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    oidcConfig.enabled
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${oidcConfig.enabled ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+                    {oidcConfig.enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                  {oidcConfig.client_id && (
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono">
+                      client: {oidcConfig.client_id}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <OIDCConfigButton config={oidcConfig} />
+            </div>
+          </section>
+        )}
 
         {/* Access control warning */}
         <section>
