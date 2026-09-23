@@ -3,8 +3,8 @@
 import { compare } from 'bcryptjs';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import pool, { type UserRow } from '@/lib/db';
-import { createSession, deleteSession, decrypt } from '@/lib/session';
+import pool, { type UserRow, type OIDCTokenRow } from '@/lib/db';
+import { createSession, deleteSession, decrypt, OIDC_RT_COOKIE } from '@/lib/session';
 import { buildEndSessionURL } from '@/lib/oidc';
 
 export interface AuthState {
@@ -67,19 +67,24 @@ export async function logoutAction(): Promise<void> {
   const session = await decrypt(token);
 
   await deleteSession();
+  cookieStore.delete(OIDC_RT_COOKIE);
 
-  if (
-    session?.loginMethod === 'oidc' &&
-    session.endSessionEndpoint &&
-    session.idToken
-  ) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-    const logoutUrl = buildEndSessionURL({
-      endSessionEndpoint: session.endSessionEndpoint,
-      idToken: session.idToken,
-      postLogoutRedirectUri: `${appUrl}/login`,
-    });
-    redirect(logoutUrl);
+  if (session?.loginMethod === 'oidc' && session.endSessionEndpoint && session.sub) {
+    const { rows: [tokenRow] } = await pool.query<Pick<OIDCTokenRow, 'id_token'>>(
+      'SELECT id_token FROM oidc_tokens WHERE user_id = $1',
+      [Number(session.sub)]
+    );
+    const idToken = tokenRow?.id_token;
+
+    if (idToken) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+      const logoutUrl = buildEndSessionURL({
+        endSessionEndpoint: session.endSessionEndpoint,
+        idToken,
+        postLogoutRedirectUri: `${appUrl}/login`,
+      });
+      redirect(logoutUrl);
+    }
   }
 
   redirect('/login');

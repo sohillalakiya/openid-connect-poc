@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool, { type OIDCConfigRow, type UserRow } from '@/lib/db';
-import { createSession } from '@/lib/session';
+import { createSession, sessionMaxAge, OIDC_RT_COOKIE, oidcRtCookieOptions } from '@/lib/session';
 import { exchangeCode, fetchOIDCConfig, fetchUserInfo, extractEmail } from '@/lib/oidc';
+import { verifyAccessTokenJWT } from '@/lib/oidc-edge';
 
 export async function GET(request: NextRequest): Promise<Response> {
   const { searchParams } = request.nextUrl;
@@ -35,10 +36,15 @@ export async function GET(request: NextRequest): Promise<Response> {
   let email: string;
   let idToken: string;
   let accessToken: string;
+  let refreshToken: string | undefined;
+  let accessTokenExpiresAt: number;
+  let tokenEndpoint: string;
+  let jwksUri: string | undefined;
 
   try {
     const discovery = await fetchOIDCConfig(config.well_known_url);
     const redirectUri = `${appUrl}/api/auth/callback`;
+    const authMethod = config.token_endpoint_auth_method ?? 'client_secret_basic';
 
     const tokens = await exchangeCode({
       tokenEndpoint: discovery.token_endpoint,
@@ -47,11 +53,23 @@ export async function GET(request: NextRequest): Promise<Response> {
       code,
       redirectUri,
       codeVerifier: codeVerifier || undefined,
-      authMethod: config.token_endpoint_auth_method ?? 'client_secret_basic',
+      authMethod,
     });
 
     idToken = tokens.id_token;
     accessToken = tokens.access_token;
+    refreshToken = tokens.refresh_token;
+    accessTokenExpiresAt = Math.floor(Date.now() / 1000) + (tokens.expires_in ?? 3600);
+    tokenEndpoint = discovery.token_endpoint;
+    jwksUri = discovery.jwks_uri;
+
+    if (jwksUri) {
+      try {
+        await verifyAccessTokenJWT(accessToken, jwksUri);
+      } catch (verifyErr) {
+        console.warn('[OIDC] Access token JWT verification failed (non-blocking):', verifyErr);
+      }
+    }
 
     const userinfo = await fetchUserInfo(discovery.userinfo_endpoint, tokens.access_token);
     email = extractEmail(userinfo);
@@ -93,16 +111,39 @@ export async function GET(request: NextRequest): Promise<Response> {
     return res;
   }
 
-  await createSession({
+  // Store large tokens in DB (keeps session cookie small)
+  await pool.query(
+    `INSERT INTO oidc_tokens (user_id, access_token, id_token, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+       access_token = EXCLUDED.access_token,
+       id_token     = EXCLUDED.id_token,
+       updated_at   = NOW()`,
+    [user.id, accessToken, idToken]
+  );
+
+  const sessionPayload = {
     sub: String(user.id),
     username: user.username,
-    loginMethod: 'oidc',
-    idToken,
+    loginMethod: 'oidc' as const,
     endSessionEndpoint: endSessionEndpoint || undefined,
-    accessToken,
-  });
+    accessTokenExpiresAt,
+    tokenEndpoint,
+    jwksUri,
+    oidcClientId: config.client_id,
+    oidcClientSecret: config.client_secret || undefined,
+    oidcAuthMethod: config.token_endpoint_auth_method ?? 'client_secret_basic',
+  };
 
-  const res = NextResponse.redirect(new URL('/userinfo', appUrl));
+  await createSession(sessionPayload);
+
+  const res = NextResponse.redirect(new URL('/verifying', appUrl));
   clearOidcCookies(res);
+
+  // Refresh token in its own small cookie (readable by middleware without DB)
+  if (refreshToken) {
+    res.cookies.set(OIDC_RT_COOKIE, refreshToken, oidcRtCookieOptions(sessionMaxAge(sessionPayload)));
+  }
+
   return res;
 }

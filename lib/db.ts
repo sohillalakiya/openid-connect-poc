@@ -10,7 +10,7 @@ export const pool: Pool = globalThis.__pool ?? (() => {
   const p = new Pool({
     connectionString:
       process.env.DATABASE_URL ??
-      'postgresql://patra_user:SecurePostgres2024!@localhost:5432/patra_user',
+      'postgresql://patra_user:SecurePostgres2024!@localhost:5432/postgres',
   });
   if (process.env.NODE_ENV !== 'production') globalThis.__pool = p;
   return p;
@@ -54,7 +54,16 @@ export async function initialize(): Promise<void> {
   await pool.query(`ALTER TABLE oidc_config ADD COLUMN IF NOT EXISTS pkce_enabled INTEGER NOT NULL DEFAULT 1`);
   await pool.query(`ALTER TABLE oidc_config ADD COLUMN IF NOT EXISTS token_endpoint_auth_method TEXT NOT NULL DEFAULT 'client_secret_basic'`);
 
-  console.log('[DB] Schema ready — tables: users, oidc_config');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS oidc_tokens (
+      user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      access_token TEXT NOT NULL DEFAULT '',
+      id_token     TEXT NOT NULL DEFAULT '',
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  console.log('[DB] Schema ready — tables: users, oidc_config, oidc_tokens');
 
   const username      = process.env.SEED_USERNAME ?? 'sohil';
   const password      = process.env.SEED_PASSWORD ?? 'sohil';
@@ -125,6 +134,12 @@ export interface UserRow {
   username: string;
   email: string;
   password: string;
+}
+
+export interface OIDCTokenRow {
+  user_id: number;
+  access_token: string;
+  id_token: string;
 }
 
 export interface OIDCConfigRow {

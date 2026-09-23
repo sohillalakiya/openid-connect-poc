@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decrypt } from '@/lib/session';
+import pool, { type OIDCTokenRow } from '@/lib/db';
+import { decrypt, OIDC_RT_COOKIE } from '@/lib/session';
 import { buildEndSessionURL } from '@/lib/oidc';
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -15,7 +16,14 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   if (session?.loginMethod === 'oidc') {
     endSessionEndpoint = session.endSessionEndpoint;
-    idToken = session.idToken;
+    // idToken is now in DB
+    if (session.sub) {
+      const { rows: [tokenRow] } = await pool.query<Pick<OIDCTokenRow, 'id_token'>>(
+        'SELECT id_token FROM oidc_tokens WHERE user_id = $1',
+        [Number(session.sub)]
+      );
+      idToken = tokenRow?.id_token;
+    }
   } else if (oidcErrorRaw) {
     try {
       const parsed = JSON.parse(oidcErrorRaw);
@@ -41,5 +49,6 @@ export async function GET(request: NextRequest): Promise<Response> {
   const res = NextResponse.redirect(redirectTarget);
   res.cookies.set('session', '', { maxAge: 0, path: '/' });
   res.cookies.set('oidc_error', '', { maxAge: 0, path: '/' });
+  res.cookies.set(OIDC_RT_COOKIE, '', { maxAge: 0, path: '/' });
   return res;
 }
